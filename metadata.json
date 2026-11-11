@@ -1,0 +1,6 @@
+{
+  "name": "COF & Settlement Summary Generator",
+  "description": "High-precision client-side banking report parser, Cost of Fund (COF) calculator, and Settlement Summary generator for CBS PDF reports with live Excel export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
