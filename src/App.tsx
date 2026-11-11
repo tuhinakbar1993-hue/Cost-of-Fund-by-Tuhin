@@ -35,6 +35,7 @@ import {
   exportSummaryExcel,
 } from './export/excelExport';
 import { getOceanAgroSampleData } from './sample/oceanAgroData';
+import { getSaimaAgroSampleData } from './sample/saimaAgroData';
 import {
   computeContentHash,
   extractTextFromPdf,
@@ -250,6 +251,43 @@ export default function App() {
     setDuplicateCount(0);
     const duration = Math.round(performance.now() - t0);
     setTimingMessage(`Loaded 6 benchmark CBS files in ${duration} ms (Acceptance Case)`);
+  };
+
+  // Load sample case handler (Saima Agro Farm - Party Performance Realized 44,949.78)
+  const handleLoadSaimaSample = () => {
+    const t0 = performance.now();
+    const sample = getSaimaAgroSampleData();
+
+    setLedgers(sample.ledgers);
+    setOutstandingReport(sample.outstandingReport);
+    setPartyPerformance(sample.partyPerformance);
+    setCalculationUpToDate('05/11/2026');
+
+    setUploadedFiles([
+      ...sample.ledgers.map((l) => ({
+        id: `sample-${l.accountNo}`,
+        name: l.fileName,
+        size: 45200,
+        type: 'INVESTMENT_LEDGER' as const,
+        accountNo: l.accountNo,
+      })),
+      {
+        id: 'sample-outstanding',
+        name: sample.outstandingReport.fileName,
+        size: 38400,
+        type: 'CUSTOMER_OUTSTANDING' as const,
+      },
+      {
+        id: 'sample-party-perf',
+        name: sample.partyPerformance.fileName,
+        size: 41200,
+        type: 'PARTY_PERFORMANCE' as const,
+      },
+    ]);
+
+    setDuplicateCount(0);
+    const duration = Math.round(performance.now() - t0);
+    setTimingMessage(`Loaded Saima Agro Farm sample in ${duration} ms (Realized: BDT 44,949.78)`);
   };
 
   // Reset to clean slate

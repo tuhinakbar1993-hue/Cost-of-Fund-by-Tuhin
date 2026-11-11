@@ -155,8 +155,22 @@ export function splitIntervalByCalendarYears(
 
 /**
  * Converts a UTC day number to an Excel serial number or Date object.
- * Excel day 1 is 1900-01-01. (JavaScript epoch is 1970-01-01 = Excel day 25569).
+ * Uses exact UTC midnight to guarantee integer serial date numbers in Excel.
  */
 export function utcDayToDateObj(dayNumber: number): Date {
-  return new Date(dayNumber * MS_PER_DAY);
+  const parts = utcDayToParts(dayNumber);
+  return new Date(Date.UTC(parts.year, parts.month - 1, parts.day, 0, 0, 0));
+}
+
+/**
+ * Converts a date string (dd/mm/yyyy, dd.mm.yyyy, dd-mm-yyyy) or UTC day number
+ * into a genuine UTC Date object for Excel date storage.
+ * ExcelJS serializes Date objects as genuine Excel date values with date formatting.
+ */
+export function parseDateToExcelDate(dateStrOrDay: string | number): Date {
+  if (typeof dateStrOrDay === 'number') {
+    return utcDayToDateObj(dateStrOrDay);
+  }
+  const utcDay = parseDateToUtcDay(dateStrOrDay);
+  return utcDayToDateObj(utcDay);
 }

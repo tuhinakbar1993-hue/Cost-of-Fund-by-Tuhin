@@ -5,19 +5,11 @@
 
 import * as pdfjsLib from 'pdfjs-dist';
 
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+
 // Configure pdfjs worker in Vite
-// Use CDN or worker url fallback to guarantee 100% reliability in browser and test environments
 if (typeof window !== 'undefined') {
-  try {
-    // In browser with vite:
-    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-      'pdfjs-dist/build/pdf.worker.min.mjs',
-      import.meta.url
-    ).toString();
-  } catch {
-    // Fallback CDN if bundler worker fails
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
-  }
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker || `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 }
 
 export interface PdfTextItem {

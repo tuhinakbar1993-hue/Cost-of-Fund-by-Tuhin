@@ -9,8 +9,10 @@ import {
   RateYear,
   SummaryCalculationResult,
 } from '../types';
-import { formatUtcDayDot } from '../utils/dateUtils';
+import { formatUtcDayDot, parseDateToExcelDate } from '../utils/dateUtils';
 
+// Standard Excel recognized date format
+const EXCEL_DATE_FORMAT = 'dd/mm/yyyy';
 // Currency format for COF table
 const COF_CURRENCY_FORMAT = '_(* #,##0.00_);_(* (#,##0.00);_(* "-"??_);_(@_)';
 // Millions display format for Summary sheet
@@ -177,16 +179,18 @@ export async function exportCofExcel(
       const row = sheet.getRow(currentRow);
       row.height = 20;
 
-      // C: Start Date (dd/mm/yyyy)
+      // C: Start Date (Disbursment Date) - Stored as genuine Excel Date value
       const cCell = row.getCell(3);
-      cCell.value = seg.startDate;
+      cCell.value = parseDateToExcelDate(seg.startUtcDay);
+      cCell.numFmt = EXCEL_DATE_FORMAT;
       cCell.alignment = { horizontal: 'center' };
       cCell.font = { name: 'Times New Roman', size: 11 };
       cCell.border = THIN_BORDER;
 
-      // D: End Date (dd/mm/yyyy)
+      // D: End Date (Adjustment Date) - Stored as genuine Excel Date value
       const dCell = row.getCell(4);
-      dCell.value = seg.endDate;
+      dCell.value = parseDateToExcelDate(seg.endUtcDay);
+      dCell.numFmt = EXCEL_DATE_FORMAT;
       dCell.alignment = { horizontal: 'center' };
       dCell.font = { name: 'Times New Roman', size: 11 };
       dCell.border = THIN_BORDER;

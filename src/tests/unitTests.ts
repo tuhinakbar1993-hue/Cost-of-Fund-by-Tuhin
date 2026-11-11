@@ -24,6 +24,7 @@ import { getOceanAgroSampleData } from '../sample/oceanAgroData';
 import { LedgerReport } from '../types';
 import {
   getInclusiveDays,
+  parseDateToExcelDate,
   parseDateToUtcDay,
   splitIntervalByCalendarYears,
 } from '../utils/dateUtils';
@@ -472,6 +473,88 @@ export function runAllUnitTests(): TestResult[] {
     }
     if (sumRes.liability.principal === outstandingReport.grandTotal.disburse) {
       throw new Error(`Summary Principal was erroneously populated from Disburse!`);
+    }
+  });
+
+  // -------------------------------------------------------------
+  // Category 8: Genuine Date Formatting in Cost of Fund Output
+  // -------------------------------------------------------------
+  runTest('Excel Date Values', 'Dates are stored as genuine Excel Date objects with valid timestamps and dd/mm/yyyy format', () => {
+    // 1. parseDateToExcelDate converts dd/mm/yyyy string to genuine Date object
+    const dateObj = parseDateToExcelDate('03/01/2023');
+    if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) {
+      throw new Error('parseDateToExcelDate did not return a valid Date object');
+    }
+    // Check UTC year, month, date
+    if (dateObj.getUTCFullYear() !== 2023 || dateObj.getUTCMonth() !== 0 || dateObj.getUTCDate() !== 3) {
+      throw new Error(`Date parts mismatch: got ${dateObj.toISOString()}, expected 2023-01-03`);
+    }
+
+    // 2. Leap year date check
+    const leapEnd = parseDateToExcelDate('29/02/2024');
+    if (leapEnd.getUTCFullYear() !== 2024 || leapEnd.getUTCMonth() !== 1 || leapEnd.getUTCDate() !== 29) {
+      throw new Error('Leap year date not properly recognized');
+    }
+
+    // 3. Date math in milliseconds produces exact integer day differences
+    const d1 = parseDateToExcelDate('01/01/2024');
+    const d2 = parseDateToExcelDate('31/12/2024');
+    const diffDays = Math.round((d2.getTime() - d1.getTime()) / 86400000) + 1;
+    if (diffDays !== 366) {
+      throw new Error(`Expected 366 days in 2024, got ${diffDays}`);
+    }
+  });
+
+  // -------------------------------------------------------------
+  // Category 9: Party Performance Customer Total Realized Recovery Formula
+  // -------------------------------------------------------------
+  runTest('Party Performance Recovery', 'Total already realized = Customer Total Recovery Profit + Compensation (Saima Agro Farm sample: 44,949.78)', () => {
+    // Saima Agro Farm sample figures
+    const saimaPartyReport = {
+      branchName: 'EIDGAON BRANCH',
+      customerName: 'SAIMA AGRO FARM',
+      product: 'BAI-MURABAHA (TR) AGRICULTURE INST.',
+      sanctionAmount: 300000,
+      printDate: '11/11/2026',
+      fileName: 'Party_Peformance_43d9cbe7.pdf',
+      fileHash: 'saima_hash',
+      rows: [
+        {
+          accountNo: '0549530000244',
+          disbursementDate: '03/01/23',
+          expiryDate: '03/01/26',
+          disbursementAmt: 300000,
+          receivable: { principal: 300000, profit: 59490.80, others: 300, compensation: 0, total: 359790.80 },
+          recovery: { principal: 123921.22, profit: 44949.78, others: 150, compensation: 0, total: 169021.00 },
+          outstanding: { principal: 176078.78, profit: 14541.02, others: 150, compensation: 0, total: 190769.80 },
+        },
+      ],
+      customerTotal: {
+        disbursementAmt: 300000,
+        receivable: { principal: 300000, profit: 59490.80, others: 300, compensation: 0, total: 359790.80 },
+        recovery: {
+          principal: 123921.22,
+          profit: 44949.78, // Customer Total Recovery Profit
+          others: 150,
+          compensation: 0, // Compensation is 0.00 -> treated as 0
+          total: 169021.00,
+        },
+        outstanding: { principal: 176078.78, profit: 14541.02, others: 150, compensation: 0, total: 190769.80 },
+      },
+    };
+
+    const res = calculateAllCof([], saimaPartyReport, DEFAULT_RATE_TABLE, '05/11/2026');
+
+    // Rule: Total already realized = Customer Total -> Recovery Amt. -> Profit + Customer Total -> Recovery Amt. -> Compensation
+    // For Saima Agro Farm: 44,949.78 + 0.00 = 44,949.78
+    if (res.profitRecovery !== 44949.78) {
+      throw new Error(`Expected Profit Recovery 44949.78, got ${res.profitRecovery}`);
+    }
+    if (res.compensationRecovery !== 0) {
+      throw new Error(`Expected Compensation Recovery 0, got ${res.compensationRecovery}`);
+    }
+    if (res.totalAlreadyRealized !== 44949.78) {
+      throw new Error(`Expected Total Already Realized 44949.78, got ${res.totalAlreadyRealized}`);
     }
   });
 

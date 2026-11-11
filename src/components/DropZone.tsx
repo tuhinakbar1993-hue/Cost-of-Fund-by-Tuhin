@@ -7,6 +7,7 @@ interface DropZoneProps {
   onFilesSelected: (files: File[]) => void;
   onRemoveFile: (id: string) => void;
   onLoadSample: () => void;
+  onLoadSaimaSample?: () => void;
   timingMessage?: string | null;
   duplicateCount?: number;
   isProcessing?: boolean;
@@ -17,6 +18,7 @@ export const DropZone: React.FC<DropZoneProps> = ({
   onFilesSelected,
   onRemoveFile,
   onLoadSample,
+  onLoadSaimaSample,
   timingMessage,
   duplicateCount = 0,
   isProcessing = false,
@@ -123,6 +125,19 @@ export const DropZone: React.FC<DropZoneProps> = ({
               <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
               Load Ocean Agro Farm Sample Case (4 A/Cs)
             </button>
+            {onLoadSaimaSample && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onLoadSaimaSample();
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 shadow-2xs transition-colors cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                Load Saima Agro Farm Sample (Realized: 44,949.78)
+              </button>
+            )}
           </div>
         </div>
 
