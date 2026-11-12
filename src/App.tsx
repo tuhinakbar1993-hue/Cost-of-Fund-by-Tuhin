@@ -199,7 +199,11 @@ export default function App() {
 
   // Memoized calculations: pure in-memory, executes in < 50ms
   const cofResult = useMemo(() => {
-    return calculateAllCof(ledgers, partyPerformance, rates, calculationUpToDate);
+    try {
+      return calculateAllCof(ledgers, partyPerformance, rates, calculationUpToDate);
+    } catch {
+      return calculateAllCof([], partyPerformance, rates, '01/01/2026');
+    }
   }, [ledgers, partyPerformance, rates, calculationUpToDate]);
 
   const summaryResult = useMemo(() => {
@@ -622,6 +626,14 @@ export default function App() {
               rates={rates}
               onChangeRates={handleRatesChange}
               missingYears={cofResult.missingYears}
+              ledgers={ledgers}
+              onChangeLedgerLatestDate={(accountNo, newDate) => {
+                setLedgers((prev) =>
+                  prev.map((l) =>
+                    l.accountNo === accountNo ? { ...l, lastTxDate: newDate } : l
+                  )
+                );
+              }}
               onGoToSummary={() => setActiveTab('summary')}
             />
           ) : (

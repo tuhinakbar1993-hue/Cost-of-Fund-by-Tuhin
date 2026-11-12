@@ -14,7 +14,7 @@ import {
   ArrowRight,
   Info,
 } from 'lucide-react';
-import { ManualInputs, RateYear } from '../types';
+import { LedgerReport, ManualInputs, RateYear } from '../types';
 import { calculateFsvCoveragePercent } from '../engine/summaryEngine';
 import { formatBdt } from '../utils/numberUtils';
 
@@ -25,6 +25,8 @@ interface ManualInputTabProps {
   rates: RateYear[];
   onChangeRates: (newRates: RateYear[]) => void;
   missingYears: number[];
+  ledgers: LedgerReport[];
+  onChangeLedgerLatestDate: (accountNo: string, newDate: string) => void;
   onGoToSummary: () => void;
 }
 
@@ -35,6 +37,8 @@ export const ManualInputTab: React.FC<ManualInputTabProps> = ({
   rates,
   onChangeRates,
   missingYears,
+  ledgers,
+  onChangeLedgerLatestDate,
   onGoToSummary,
 }) => {
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -687,6 +691,69 @@ export const ManualInputTab: React.FC<ManualInputTabProps> = ({
             />
           </div>
         </div>
+      </section>
+
+      {/* Category F: Investment Ledger Inputs — Latest Date */}
+      <section className="p-5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-neutral-800">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 flex items-center justify-center font-bold text-xs">
+              F
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
+                <Calculator className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                Investment Ledger Inputs — Latest Date
+              </h3>
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                Last (most recent) transaction date for each investment ledger account, available as an input for calculations
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {ledgers.length === 0 ? (
+          <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-500 dark:text-neutral-400">
+            No investment ledger accounts loaded yet. Upload ledger PDFs or load a sample case to view and edit each account&apos;s Latest Date.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+            {ledgers.map((ledger, idx) => (
+              <div
+                key={ledger.accountNo}
+                className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 space-y-2"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-neutral-800 dark:text-neutral-200 truncate">
+                    {idx + 1}. {ledger.accountNo}
+                  </span>
+                  {ledger.accountType && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-medium shrink-0">
+                      {ledger.accountType}
+                    </span>
+                  )}
+                </div>
+                {ledger.accountName && (
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate">
+                    {ledger.accountName}
+                  </p>
+                )}
+                <div>
+                  <label className="block text-neutral-600 dark:text-neutral-400 mb-1">
+                    Latest Date (dd/mm/yyyy)
+                  </label>
+                  <input
+                    type="text"
+                    value={ledger.lastTxDate}
+                    placeholder="dd/mm/yyyy"
+                    onChange={(e) => onChangeLedgerLatestDate(ledger.accountNo, e.target.value)}
+                    className="w-full px-2.5 py-1.5 rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );
