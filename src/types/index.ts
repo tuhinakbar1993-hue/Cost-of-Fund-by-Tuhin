@@ -249,6 +249,7 @@ export interface ManualInputs {
   specialRemarks: string;
   rate2014: string; // 2014 — Rate of Cost of Fund (% p.a.) manually entered by user
   rate2015: string; // 2015 — Rate of Cost of Fund (% p.a.) manually entered by user
+  defaultCofRate?: string; // Settlement Summary Default Cost of Fund Rate (% p.a., defaults to 8.98)
   bankLogo?: string | null; // Base64 data URL for bank logo
   bismillahImage?: string | null; // Base64 data URL for Bismillah header
   bankLine1: string;

@@ -394,14 +394,49 @@ export async function exportCofExcel(
   downloadBlob(blob, 'Cost_of_Fund.xlsx');
 }
 
+async function loadImageBase64(
+  customDataUrl: string | null | undefined,
+  fallbackPublicPath: string
+): Promise<{ base64: string; extension: 'jpeg' | 'png' } | null> {
+  if (customDataUrl && customDataUrl.startsWith('data:image')) {
+    const match = customDataUrl.match(/^data:image\/([a-zA-Z]+);base64,(.+)$/);
+    if (match) {
+      const ext = match[1] === 'jpeg' || match[1] === 'jpg' ? 'jpeg' : 'png';
+      return { base64: customDataUrl, extension: ext };
+    }
+  }
+  try {
+    const res = await fetch(fallbackPublicPath);
+    if (!res.ok) return null;
+    const buf = await res.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    const b64 = btoa(binary);
+    return { base64: `data:image/png;base64,${b64}`, extension: 'png' };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Generates and downloads Summary.xlsx
  */
 export async function exportSummaryExcel(
   summaryResult: SummaryCalculationResult,
-  cofResult: CofCalculationResult,
+  _cofResult: CofCalculationResult,
   manual: ManualInputs
 ): Promise<void> {
+  const stripUnwantedSummaryText = (val: string | null | undefined): string => {
+    if (!val) return '';
+    return val
+      .replace(/No\.?\s+Account\s+No\.?\s+Status\.?\s+Type\s+Open/gi, '')
+      .replace(/[ \t]{2,}/g, ' ')
+      .trim();
+  };
+
   const ExcelJS = await import('exceljs');
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Special Asset Management';
@@ -410,21 +445,30 @@ export async function exportSummaryExcel(
   const sheet = workbook.addWorksheet('Enigma Summary', {
     views: [{ showGridLines: false }],
     pageSetup: {
-      paperSize: 9, // A4
+      // Default US Letter (8.5 x 11 in, 612pt x 792pt) matching reference
       orientation: 'portrait',
       fitToWidth: 1,
       fitToHeight: 0,
+      margins: {
+        left: 0.55,
+        right: 0.55,
+        top: 0.15,
+        bottom: 0.5,
+        header: 0.1,
+        footer: 0.2,
+      },
     },
   });
 
-  // Setup column widths
-  for (let c = 1; c <= 16; c++) {
-    sheet.getColumn(c).width = 5.5;
+  // Setup equal 3-column table layout across C:P (C:F = SL, G:K = Particular, L:P = Amount)
+  sheet.getColumn(1).width = 1;
+  sheet.getColumn(2).width = 1;
+  for (let c = 3; c <= 6; c++) {
+    sheet.getColumn(c).width = 7.875; // 4 cols * 7.875 = 31.5
   }
-  sheet.getColumn(7).width = 8;
-  sheet.getColumn(8).width = 8;
-  sheet.getColumn(9).width = 8;
-  sheet.getColumn(12).width = 8;
+  for (let c = 7; c <= 16; c++) {
+    sheet.getColumn(c).width = 6.3; // 5 cols * 6.3 = 31.5 per group (G:K & L:P)
+  }
 
   const headerFill = {
     type: 'pattern' as const,
@@ -432,92 +476,107 @@ export async function exportSummaryExcel(
     fgColor: { argb: 'FFD9E2F3' },
   };
 
-  // Embed Bismillah Image and Bank Logo if provided
-  if (manual.bismillahImage && manual.bismillahImage.startsWith('data:image')) {
+  // Embed Bismillah Image and Bank Logo (custom upload or exact reference assets)
+  const [bismillahImg, bankLogoImg] = await Promise.all([
+    loadImageBase64(manual.bismillahImage, '/assets/bismillah_ref.png'),
+    loadImageBase64(manual.bankLogo, '/assets/bank_logo_ref.png'),
+  ]);
+
+  if (bismillahImg) {
     try {
-      const match = manual.bismillahImage.match(/^data:image\/([a-zA-Z]+);base64,(.+)$/);
-      if (match) {
-        const ext = match[1] === 'jpeg' || match[1] === 'jpg' ? 'jpeg' : 'png';
-        const bismillahId = workbook.addImage({
-          base64: manual.bismillahImage,
-          extension: ext as 'jpeg' | 'png',
-        });
-        sheet.addImage(bismillahId, {
-          tl: { col: 7, row: 0.8 },
-          ext: { width: 150, height: 35 },
-        });
-      }
+      const bismillahId = workbook.addImage({
+        base64: bismillahImg.base64,
+        extension: bismillahImg.extension,
+      });
+      sheet.addImage(bismillahId, {
+        tl: { col: 6.7, row: 0.15 },
+        ext: { width: 218, height: 27 },
+      });
     } catch {
       // ignore image embedding failure if format unsupported
     }
   }
 
-  if (manual.bankLogo && manual.bankLogo.startsWith('data:image')) {
+  if (bankLogoImg) {
     try {
-      const match = manual.bankLogo.match(/^data:image\/([a-zA-Z]+);base64,(.+)$/);
-      if (match) {
-        const ext = match[1] === 'jpeg' || match[1] === 'jpg' ? 'jpeg' : 'png';
-        const logoId = workbook.addImage({
-          base64: manual.bankLogo,
-          extension: ext as 'jpeg' | 'png',
-        });
-        sheet.addImage(logoId, {
-          tl: { col: 2.5, row: 3 },
-          ext: { width: 50, height: 50 },
-        });
-      }
+      const logoId = workbook.addImage({
+        base64: bankLogoImg.base64,
+        extension: bankLogoImg.extension,
+      });
+      sheet.addImage(logoId, {
+        tl: { col: 2.0, row: 1.2 },
+        ext: { width: 77, height: 87 },
+      });
     } catch {
       // ignore image embedding failure if format unsupported
     }
   }
 
-  // Bank Header (F4:N4, F5:N5, F6:N6, F7:N7)
+  // Row heights for top header block
+  sheet.getRow(1).height = 14;
+  sheet.getRow(2).height = 14;
+  sheet.getRow(3).height = 6;
+
+  // Bank Header (F4:N4, F5:N5, F6:N6, F7:N7) in #17365D
   const bankLines = [
-    manual.bankLine1 || 'SAMMILITO ISLAMI BANK PLC.',
-    manual.bankLine2 || '(State-owned Shariah-based Bank)',
-    manual.bankLine3 || 'UNION BANK UNIT',
-    manual.bankLine4 || 'Special Assets Management Division',
+    manual.bankLine1 ? stripUnwantedSummaryText(manual.bankLine1) : 'SAMMILITO ISLAMI BANK PLC.',
+    manual.bankLine2 ? stripUnwantedSummaryText(manual.bankLine2) : '(State-owned Shariah-based Bank)',
+    manual.bankLine3 ? stripUnwantedSummaryText(manual.bankLine3) : 'UNION BANK UNIT',
+    manual.bankLine4 ? stripUnwantedSummaryText(manual.bankLine4) : 'Special Assets Management Division',
   ];
 
   bankLines.forEach((text, i) => {
     const r = 4 + i;
+    sheet.getRow(r).height = i <= 1 ? 17 : 15;
     sheet.mergeCells(`F${r}:N${r}`);
     const cell = sheet.getCell(`F${r}`);
     cell.value = text;
     cell.font = {
-      name: 'Arial',
-      size: i === 0 ? 12 : 10,
-      bold: i === 0,
+      name: i === 1 ? 'Bell MT' : 'Calibri',
+      size: i === 0 ? 12 : i === 1 ? 13 : 11,
+      bold: i <= 1,
+      color: { argb: 'FF17365D' },
     };
     cell.alignment = { horizontal: 'center', vertical: 'middle' };
   });
 
-  // Row 9: Branch Name (C9) and Date (L9:P9)
+  // Row 8: Horizontal blue divider line (#4F81BD) across C8:P8
+  sheet.getRow(8).height = 6;
+  for (let c = 3; c <= 16; c++) {
+    sheet.getRow(8).getCell(c).border = {
+      bottom: { style: 'medium', color: { argb: 'FF4F81BD' } },
+    };
+  }
+
+  // Row 9: Branch Name (C9:K9) and Date (L9:P9)
+  sheet.mergeCells('C9:K9');
   const cellC9 = sheet.getCell('C9');
-  cellC9.value = `Branch Name: ${manual.branchName || 'EIDGAON BRANCH'}`;
-  cellC9.font = { name: 'Arial', size: 10, bold: true };
+  cellC9.value = `Branch Name: ${manual.branchName ? stripUnwantedSummaryText(manual.branchName) : 'EIDGAON BRANCH'}`;
+  cellC9.font = { name: 'Arial', size: 9, bold: true, color: { argb: 'FF000000' } };
 
   sheet.mergeCells('L9:P9');
   const cellL9 = sheet.getCell('L9');
-  cellL9.value = `Date:${manual.calculationUpToDate || '11/11/2026'}`;
-  cellL9.font = { name: 'Arial', size: 10, bold: true };
+  cellL9.value = `Date:${manual.calculationUpToDate ? stripUnwantedSummaryText(manual.calculationUpToDate) : '11/11/2026'}`;
+  cellL9.font = { name: 'Arial', size: 9, bold: true, color: { argb: 'FF000000' } };
   cellL9.alignment = { horizontal: 'right' };
 
   // Row 10: Client Name
+  sheet.mergeCells('C10:P10');
   const cellC10 = sheet.getCell('C10');
-  cellC10.value = `Client Name: ${manual.clientName || 'M/S OCEAN AGRO FARM'}`;
-  cellC10.font = { name: 'Arial', size: 10, bold: true };
+  cellC10.value = `Client Name: ${manual.clientName ? stripUnwantedSummaryText(manual.clientName) : 'M/S OCEAN AGRO FARM'}`;
+  cellC10.font = { name: 'Arial', size: 9, bold: true, color: { argb: 'FF000000' } };
 
   // Row 11: Managing Director
+  sheet.mergeCells('C11:P11');
   const cellC11 = sheet.getCell('C11');
-  cellC11.value = `Managing Director: ${manual.managingDirectorName || '-'}`;
-  cellC11.font = { name: 'Arial', size: 10 };
+  cellC11.value = `Managing Director: ${stripUnwantedSummaryText(manual.managingDirectorName) || '-'}`;
+  cellC11.font = { name: 'Arial', size: 9, bold: true, color: { argb: 'FF000000' } };
 
   // Row 12: Figure in Million BDT
   sheet.mergeCells('L12:P12');
   const cellL12 = sheet.getCell('L12');
   cellL12.value = 'Figure in Million BDT';
-  cellL12.font = { name: 'Arial', size: 9, italic: true };
+  cellL12.font = { name: 'Arial', size: 9, bold: true, color: { argb: 'FF000000' } };
   cellL12.alignment = { horizontal: 'right' };
 
   // Helper to format table row
@@ -533,25 +592,26 @@ export async function exportSummaryExcel(
   cellAHeader.value = `A) Liability Position as per CBS (Dated on ${formatUtcDayDot(
     Date.now()
   )})`;
-  cellAHeader.font = { name: 'Arial', size: 10, bold: true };
+  cellAHeader.font = { name: 'Arial', size: 8.5, bold: true, color: { argb: 'FF000000' } };
   cellAHeader.fill = headerFill;
+  cellAHeader.alignment = { horizontal: 'left', vertical: 'middle' };
   applyTableBorder(13);
 
   // Headers (Row 14)
   sheet.mergeCells('C14:F14');
   sheet.getCell('C14').value = 'SL';
-  sheet.getCell('C14').alignment = { horizontal: 'center' };
+  sheet.getCell('C14').alignment = { horizontal: 'center', vertical: 'middle' };
 
   sheet.mergeCells('G14:K14');
   sheet.getCell('G14').value = 'Particular';
-  sheet.getCell('G14').alignment = { horizontal: 'left' };
+  sheet.getCell('G14').alignment = { horizontal: 'left', vertical: 'middle' };
 
   sheet.mergeCells('L14:P14');
   sheet.getCell('L14').value = 'Amount';
-  sheet.getCell('L14').alignment = { horizontal: 'right' };
+  sheet.getCell('L14').alignment = { horizontal: 'center', vertical: 'middle' };
   applyTableBorder(14);
   ['C14', 'G14', 'L14'].forEach((pos) => {
-    sheet.getCell(pos).font = { name: 'Arial', size: 10, bold: true };
+    sheet.getCell(pos).font = { name: 'Arial', size: 8.5, bold: false, color: { argb: 'FF000000' } };
   });
 
   // Rows 15-21
@@ -569,29 +629,35 @@ export async function exportSummaryExcel(
     const r = 15 + idx;
     sheet.mergeCells(`C${r}:F${r}`);
     sheet.getCell(`C${r}`).value = item.sl;
-    sheet.getCell(`C${r}`).alignment = { horizontal: 'center' };
+    sheet.getCell(`C${r}`).font = { name: 'Arial', size: 8.5, color: { argb: 'FF000000' } };
+    sheet.getCell(`C${r}`).alignment = { horizontal: 'center', vertical: 'middle' };
 
     sheet.mergeCells(`G${r}:K${r}`);
     sheet.getCell(`G${r}`).value = item.name;
+    sheet.getCell(`G${r}`).font = { name: 'Arial', size: 8.5, color: { argb: 'FF000000' } };
+    sheet.getCell(`G${r}`).alignment = { horizontal: 'left', vertical: 'middle' };
 
     sheet.mergeCells(`L${r}:P${r}`);
     const valCell = sheet.getCell(`L${r}`);
+    valCell.font = { name: 'Arial', size: 8.5, color: { argb: 'FF000000' } };
     if (item.val === 0) {
       valCell.value = '-';
-      valCell.alignment = { horizontal: 'center' };
+      valCell.alignment = { horizontal: 'center', vertical: 'middle' };
     } else {
       valCell.value = item.val;
       valCell.numFmt = MILLION_BDT_FORMAT;
-      valCell.alignment = { horizontal: 'right' };
+      valCell.alignment = { horizontal: 'center', vertical: 'middle' };
     }
     applyTableBorder(r);
   });
 
-  // Row 22: Total Liability (A)
-  sheet.mergeCells('C22:K22');
-  const cellTotalA = sheet.getCell('C22');
+  // Row 22: Total Liability (A) — keeps 3-column grid intact (C22:F22 blank, G22:K22 label, L22:P22 total)
+  sheet.mergeCells('C22:F22');
+  sheet.mergeCells('G22:K22');
+  const cellTotalA = sheet.getCell('G22');
   cellTotalA.value = 'Total Liability (A)';
-  cellTotalA.font = { name: 'Arial', size: 10, bold: true };
+  cellTotalA.font = { name: 'Arial', size: 8.5, bold: true, color: { argb: 'FF000000' } };
+  cellTotalA.alignment = { horizontal: 'left', vertical: 'middle' };
 
   sheet.mergeCells('L22:P22');
   const valTotalA = sheet.getCell('L22');
@@ -599,31 +665,33 @@ export async function exportSummaryExcel(
     formula: 'SUM(L15:L21)',
     result: summaryResult.liability.totalLiabilityA,
   };
-  valTotalA.font = { name: 'Arial', size: 10, bold: true };
+  valTotalA.font = { name: 'Arial', size: 8.5, bold: true, color: { argb: 'FF000000' } };
   valTotalA.numFmt = MILLION_BDT_FORMAT;
-  valTotalA.alignment = { horizontal: 'right' };
+  valTotalA.alignment = { horizontal: 'center', vertical: 'middle' };
   applyTableBorder(22);
 
   // SECTION B: Settlement Amount Covering Cost of Fund
   sheet.mergeCells('C24:P24');
   const cellBHeader = sheet.getCell('C24');
   cellBHeader.value = 'B) Settlement Amount Covering Cost of Fund';
-  cellBHeader.font = { name: 'Arial', size: 10, bold: true };
+  cellBHeader.font = { name: 'Arial', size: 8.5, bold: true, color: { argb: 'FF000000' } };
   cellBHeader.fill = headerFill;
+  cellBHeader.alignment = { horizontal: 'left', vertical: 'middle' };
   applyTableBorder(24);
 
   // Row 25 headers
   sheet.mergeCells('C25:F25');
   sheet.getCell('C25').value = 'SL';
-  sheet.getCell('C25').alignment = { horizontal: 'center' };
+  sheet.getCell('C25').alignment = { horizontal: 'center', vertical: 'middle' };
   sheet.mergeCells('G25:K25');
   sheet.getCell('G25').value = 'Particular';
+  sheet.getCell('G25').alignment = { horizontal: 'left', vertical: 'middle' };
   sheet.mergeCells('L25:P25');
   sheet.getCell('L25').value = 'Amount';
-  sheet.getCell('L25').alignment = { horizontal: 'right' };
+  sheet.getCell('L25').alignment = { horizontal: 'center', vertical: 'middle' };
   applyTableBorder(25);
   ['C25', 'G25', 'L25'].forEach((pos) => {
-    sheet.getCell(pos).font = { name: 'Arial', size: 10, bold: true };
+    sheet.getCell(pos).font = { name: 'Arial', size: 8.5, bold: false, color: { argb: 'FF000000' } };
   });
 
   // Rows 26-28: Principal, Charges, Cost of Fund
@@ -636,10 +704,13 @@ export async function exportSummaryExcel(
   bRows.forEach((item) => {
     sheet.mergeCells(`C${item.r}:F${item.r}`);
     sheet.getCell(`C${item.r}`).value = item.sl;
-    sheet.getCell(`C${item.r}`).alignment = { horizontal: 'center' };
+    sheet.getCell(`C${item.r}`).font = { name: 'Arial', size: 8.5, color: { argb: 'FF000000' } };
+    sheet.getCell(`C${item.r}`).alignment = { horizontal: 'center', vertical: 'middle' };
 
     sheet.mergeCells(`G${item.r}:K${item.r}`);
     sheet.getCell(`G${item.r}`).value = item.name;
+    sheet.getCell(`G${item.r}`).font = { name: 'Arial', size: 8.5, color: { argb: 'FF000000' } };
+    sheet.getCell(`G${item.r}`).alignment = { horizontal: 'left', vertical: 'middle' };
 
     sheet.mergeCells(`L${item.r}:P${item.r}`);
     const valCell = sheet.getCell(`L${item.r}`);
@@ -648,16 +719,19 @@ export async function exportSummaryExcel(
     } else {
       valCell.value = item.val;
     }
+    valCell.font = { name: 'Arial', size: 8.5, color: { argb: 'FF000000' } };
     valCell.numFmt = MILLION_BDT_FORMAT;
-    valCell.alignment = { horizontal: 'right' };
+    valCell.alignment = { horizontal: 'center', vertical: 'middle' };
     applyTableBorder(item.r);
   });
 
   // Row 29: Total Settlement Amount (B)
-  sheet.mergeCells('C29:K29');
-  const cellTotalB = sheet.getCell('C29');
+  sheet.mergeCells('C29:F29');
+  sheet.mergeCells('G29:K29');
+  const cellTotalB = sheet.getCell('G29');
   cellTotalB.value = 'Total Settlement Amount (B)';
-  cellTotalB.font = { name: 'Arial', size: 10, bold: true };
+  cellTotalB.font = { name: 'Arial', size: 8.5, bold: true, color: { argb: 'FF000000' } };
+  cellTotalB.alignment = { horizontal: 'left', vertical: 'middle' };
 
   sheet.mergeCells('L29:P29');
   const valTotalB = sheet.getCell('L29');
@@ -665,31 +739,33 @@ export async function exportSummaryExcel(
     formula: 'SUM(L26:L28)',
     result: summaryResult.settlement.totalSettlementB,
   };
-  valTotalB.font = { name: 'Arial', size: 10, bold: true };
+  valTotalB.font = { name: 'Arial', size: 8.5, bold: true, color: { argb: 'FF000000' } };
   valTotalB.numFmt = MILLION_BDT_FORMAT;
-  valTotalB.alignment = { horizontal: 'right' };
+  valTotalB.alignment = { horizontal: 'center', vertical: 'middle' };
   applyTableBorder(29);
 
   // SECTION C: Proposed Waiver Covering Cost of Fund (A-B)
   sheet.mergeCells('C31:P31');
   const cellCHeader = sheet.getCell('C31');
   cellCHeader.value = 'C) Proposed Waiver Covering Cost of Fund (A-B)';
-  cellCHeader.font = { name: 'Arial', size: 10, bold: true };
+  cellCHeader.font = { name: 'Arial', size: 8.5, bold: true, color: { argb: 'FF000000' } };
   cellCHeader.fill = headerFill;
+  cellCHeader.alignment = { horizontal: 'left', vertical: 'middle' };
   applyTableBorder(31);
 
   // Row 32 headers
   sheet.mergeCells('C32:F32');
   sheet.getCell('C32').value = 'SL';
-  sheet.getCell('C32').alignment = { horizontal: 'center' };
+  sheet.getCell('C32').alignment = { horizontal: 'center', vertical: 'middle' };
   sheet.mergeCells('G32:K32');
   sheet.getCell('G32').value = 'Particular';
+  sheet.getCell('G32').alignment = { horizontal: 'left', vertical: 'middle' };
   sheet.mergeCells('L32:P32');
   sheet.getCell('L32').value = 'Amount';
-  sheet.getCell('L32').alignment = { horizontal: 'right' };
+  sheet.getCell('L32').alignment = { horizontal: 'center', vertical: 'middle' };
   applyTableBorder(32);
   ['C32', 'G32', 'L32'].forEach((pos) => {
-    sheet.getCell(pos).font = { name: 'Arial', size: 10, bold: true };
+    sheet.getCell(pos).font = { name: 'Arial', size: 8.5, bold: false, color: { argb: 'FF000000' } };
   });
 
   // Rows 33-40: SL 1,2,3,4, Current Principal (1+2+3+4), 6, 7, 8 all "-"
@@ -707,23 +783,29 @@ export async function exportSummaryExcel(
   cRows.forEach((item) => {
     sheet.mergeCells(`C${item.r}:F${item.r}`);
     sheet.getCell(`C${item.r}`).value = item.sl;
-    sheet.getCell(`C${item.r}`).alignment = { horizontal: 'center' };
+    sheet.getCell(`C${item.r}`).font = { name: 'Arial', size: 8.5, color: { argb: 'FF000000' } };
+    sheet.getCell(`C${item.r}`).alignment = { horizontal: 'center', vertical: 'middle' };
 
     sheet.mergeCells(`G${item.r}:K${item.r}`);
     sheet.getCell(`G${item.r}`).value = item.name;
+    sheet.getCell(`G${item.r}`).font = { name: 'Arial', size: 8.5, color: { argb: 'FF000000' } };
+    sheet.getCell(`G${item.r}`).alignment = { horizontal: 'left', vertical: 'middle' };
 
     sheet.mergeCells(`L${item.r}:P${item.r}`);
     const valCell = sheet.getCell(`L${item.r}`);
     valCell.value = '-';
-    valCell.alignment = { horizontal: 'center' };
+    valCell.font = { name: 'Arial', size: 8.5, color: { argb: 'FF000000' } };
+    valCell.alignment = { horizontal: 'center', vertical: 'middle' };
     applyTableBorder(item.r);
   });
 
   // Row 41: Total Liability = L22 - L29
-  sheet.mergeCells('C41:K41');
-  const cellTotalC = sheet.getCell('C41');
+  sheet.mergeCells('C41:F41');
+  sheet.mergeCells('G41:K41');
+  const cellTotalC = sheet.getCell('G41');
   cellTotalC.value = 'Total Liability';
-  cellTotalC.font = { name: 'Arial', size: 10, bold: true };
+  cellTotalC.font = { name: 'Arial', size: 8.5, bold: true, color: { argb: 'FF000000' } };
+  cellTotalC.alignment = { horizontal: 'left', vertical: 'middle' };
 
   sheet.mergeCells('L41:P41');
   const valTotalC = sheet.getCell('L41');
@@ -731,25 +813,26 @@ export async function exportSummaryExcel(
     formula: 'L22-L29',
     result: summaryResult.waiver.totalWaiverC,
   };
-  valTotalC.font = { name: 'Arial', size: 10, bold: true };
+  valTotalC.font = { name: 'Arial', size: 8.5, bold: true, color: { argb: 'FF000000' } };
   valTotalC.numFmt = MILLION_BDT_FORMAT;
-  valTotalC.alignment = { horizontal: 'right' };
+  valTotalC.alignment = { horizontal: 'center', vertical: 'middle' };
   applyTableBorder(41);
 
   // Row 43: Security Valuation
   sheet.getCell('C43').value = 'SL';
-  sheet.getCell('C43').alignment = { horizontal: 'center' };
+  sheet.getCell('C43').font = { name: 'Arial', size: 8.5, bold: false, color: { argb: 'FF000000' } };
+  sheet.getCell('C43').alignment = { horizontal: 'center', vertical: 'middle' };
   sheet.mergeCells('D43:M43');
-  const secFirm = manual.valuationFirm || 'Survey Firm';
-  const secDate = manual.valuationDate || '11/11/2026';
+  const secFirm = manual.valuationFirm ? stripUnwantedSummaryText(manual.valuationFirm) : 'Survey Firm';
+  const secDate = manual.valuationDate ? stripUnwantedSummaryText(manual.valuationDate) : '11/11/2026';
   sheet.getCell('D43').value = `Security Valuation by ${secFirm} On ${secDate}`;
-  sheet.getCell('D43').font = { name: 'Arial', size: 10, bold: true };
+  sheet.getCell('D43').font = { name: 'Arial', size: 8.5, bold: true, color: { argb: 'FF000000' } };
   sheet.getCell('D43').fill = headerFill;
 
   sheet.mergeCells('N43:P43');
   sheet.getCell('N43').value = 'Amount';
-  sheet.getCell('N43').font = { name: 'Arial', size: 10, bold: true };
-  sheet.getCell('N43').alignment = { horizontal: 'right' };
+  sheet.getCell('N43').font = { name: 'Arial', size: 8.5, bold: true, color: { argb: 'FF000000' } };
+  sheet.getCell('N43').alignment = { horizontal: 'center', vertical: 'middle' };
   applyTableBorder(43);
 
   // Rows 44-46: MV, FSV, Liability covered by FSV (%)
@@ -760,32 +843,38 @@ export async function exportSummaryExcel(
 
   secRows.forEach((item) => {
     sheet.getCell(`C${item.r}`).value = item.sl;
-    sheet.getCell(`C${item.r}`).alignment = { horizontal: 'center' };
+    sheet.getCell(`C${item.r}`).font = { name: 'Arial', size: 8.5, color: { argb: 'FF000000' } };
+    sheet.getCell(`C${item.r}`).alignment = { horizontal: 'center', vertical: 'middle' };
 
     sheet.mergeCells(`D${item.r}:M${item.r}`);
     sheet.getCell(`D${item.r}`).value = item.name;
+    sheet.getCell(`D${item.r}`).font = { name: 'Arial', size: 8.5, color: { argb: 'FF000000' } };
 
     sheet.mergeCells(`N${item.r}:P${item.r}`);
     const vCell = sheet.getCell(`N${item.r}`);
+    vCell.font = { name: 'Arial', size: 8.5, color: { argb: 'FF000000' } };
     if (item.val !== null && item.val !== undefined && item.val !== ('' as unknown as number)) {
       vCell.value = item.val;
       vCell.numFmt = MILLION_BDT_FORMAT;
-      vCell.alignment = { horizontal: 'right' };
+      vCell.alignment = { horizontal: 'center', vertical: 'middle' };
     } else {
       vCell.value = '';
-      vCell.alignment = { horizontal: 'center' };
+      vCell.alignment = { horizontal: 'center', vertical: 'middle' };
     }
     applyTableBorder(item.r);
   });
 
   // Row 46: Liability covered by FSV (%)
   sheet.getCell('C46').value = 3;
-  sheet.getCell('C46').alignment = { horizontal: 'center' };
+  sheet.getCell('C46').font = { name: 'Arial', size: 8.5, color: { argb: 'FF000000' } };
+  sheet.getCell('C46').alignment = { horizontal: 'center', vertical: 'middle' };
   sheet.mergeCells('D46:M46');
   sheet.getCell('D46').value = 'Liability covered by FSV (%)';
+  sheet.getCell('D46').font = { name: 'Arial', size: 8.5, bold: true, color: { argb: 'FF000000' } };
 
   sheet.mergeCells('N46:P46');
   const fsvCovCell = sheet.getCell('N46');
+  fsvCovCell.font = { name: 'Arial', size: 8.5, bold: true, color: { argb: 'FF000000' } };
   const manualPercentVal = manual.liabilityCoveredByFsvPercentManual
     ? parseFloat(manual.liabilityCoveredByFsvPercentManual)
     : null;
@@ -794,7 +883,7 @@ export async function exportSummaryExcel(
     // User explicitly entered a custom percentage
     fsvCovCell.value = manualPercentVal / 100;
     fsvCovCell.numFmt = '0.00%';
-    fsvCovCell.alignment = { horizontal: 'right' };
+    fsvCovCell.alignment = { horizontal: 'center', vertical: 'middle' };
   } else if (manual.useSuggestedFsvPercent && manual.forcedSaleValue && summaryResult.liability.totalLiabilityA > 0) {
     // Calculated suggestion with formula
     fsvCovCell.value = {
@@ -802,58 +891,61 @@ export async function exportSummaryExcel(
       result: manual.forcedSaleValue / summaryResult.liability.totalLiabilityA,
     };
     fsvCovCell.numFmt = '0.00%';
-    fsvCovCell.alignment = { horizontal: 'right' };
+    fsvCovCell.alignment = { horizontal: 'center', vertical: 'middle' };
   } else if (manual.liabilityCoveredByFsvPercentManual && manual.liabilityCoveredByFsvPercentManual.trim() !== '') {
     const parsed = parseFloat(manual.liabilityCoveredByFsvPercentManual);
     if (!isNaN(parsed)) {
       fsvCovCell.value = parsed / 100;
       fsvCovCell.numFmt = '0.00%';
-      fsvCovCell.alignment = { horizontal: 'right' };
+      fsvCovCell.alignment = { horizontal: 'center', vertical: 'middle' };
     } else {
       fsvCovCell.value = '';
     }
   } else {
     fsvCovCell.value = '';
-    fsvCovCell.alignment = { horizontal: 'center' };
+    fsvCovCell.alignment = { horizontal: 'center', vertical: 'middle' };
   }
   applyTableBorder(46);
 
   // Row 48: Legal Position
   sheet.getCell('C48').value = 'SL';
-  sheet.getCell('C48').alignment = { horizontal: 'center' };
+  sheet.getCell('C48').font = { name: 'Arial', size: 8.5, color: { argb: 'FF000000' } };
+  sheet.getCell('C48').alignment = { horizontal: 'center', vertical: 'middle' };
   sheet.mergeCells('D48:E48');
   sheet.getCell('D48').value = 'Legal Position';
-  sheet.getCell('D48').font = { name: 'Arial', size: 10, bold: true };
+  sheet.getCell('D48').font = { name: 'Arial', size: 8.5, bold: true, color: { argb: 'FF000000' } };
   sheet.mergeCells('F48:P48');
   sheet.getCell('F48').value = 'Particulars';
-  sheet.getCell('F48').font = { name: 'Arial', size: 10, bold: true };
+  sheet.getCell('F48').font = { name: 'Arial', size: 8.5, bold: true, color: { argb: 'FF000000' } };
   applyTableBorder(48);
 
   const legalRows = [
-    { r: 49, sl: 1, title: 'NI ACT', text: manual.legalNiAct ? manual.legalNiAct.trim() : '' },
-    { r: 50, sl: 2, title: 'Arthari & Other', text: manual.legalArthari ? manual.legalArthari.trim() : '' },
-    { r: 51, sl: 3, title: 'Other', text: manual.legalOther ? manual.legalOther.trim() : '' },
+    { r: 49, sl: 1, title: 'NI ACT', text: stripUnwantedSummaryText(manual.legalNiAct) },
+    { r: 50, sl: 2, title: 'Arthari & Other', text: stripUnwantedSummaryText(manual.legalArthari) },
+    { r: 51, sl: 3, title: 'Other', text: stripUnwantedSummaryText(manual.legalOther) },
   ];
 
   legalRows.forEach((item) => {
     sheet.getCell(`C${item.r}`).value = item.sl;
-    sheet.getCell(`C${item.r}`).alignment = { horizontal: 'center' };
+    sheet.getCell(`C${item.r}`).font = { name: 'Arial', size: 8.5, color: { argb: 'FF000000' } };
+    sheet.getCell(`C${item.r}`).alignment = { horizontal: 'center', vertical: 'middle' };
 
     sheet.mergeCells(`D${item.r}:E${item.r}`);
     sheet.getCell(`D${item.r}`).value = item.title;
+    sheet.getCell(`D${item.r}`).font = { name: 'Arial', size: 8.5, bold: true, color: { argb: 'FF000000' } };
 
     sheet.mergeCells(`F${item.r}:P${item.r}`);
     sheet.getCell(`F${item.r}`).value = item.text ? item.text : '';
+    sheet.getCell(`F${item.r}`).font = { name: 'Arial', size: 8.5, color: { argb: 'FF000000' } };
     applyTableBorder(item.r);
   });
 
   // Row 53: Special Remarks
   sheet.mergeCells('C53:P53');
   const remCell = sheet.getCell('C53');
-  remCell.value = manual.specialRemarks && manual.specialRemarks.trim()
-    ? `Special Remarks: ${manual.specialRemarks.trim()}`
-    : '';
-  remCell.font = { name: 'Arial', size: 9, italic: true };
+  const cleanedRemarks = stripUnwantedSummaryText(manual.specialRemarks);
+  remCell.value = cleanedRemarks ? `Special Remarks: ${cleanedRemarks}` : '';
+  remCell.font = { name: 'Arial', size: 8.5, italic: true, color: { argb: 'FF000000' } };
 
   // Write and download
   const buffer = await workbook.xlsx.writeBuffer();

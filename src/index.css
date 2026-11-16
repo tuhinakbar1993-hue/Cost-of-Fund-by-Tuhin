@@ -11,3 +11,29 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+@page {
+  size: letter portrait;
+  margin: 0;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .summary-print-sheet,
+  .summary-print-sheet * {
+    visibility: visible;
+  }
+  .summary-print-sheet {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 8.5in !important;
+    min-width: 8.5in !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+}
+

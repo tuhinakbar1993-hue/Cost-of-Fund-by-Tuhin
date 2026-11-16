@@ -29,7 +29,7 @@ export const DEFAULT_RATE_TABLE: RateYear[] = [
   { year: 2023, rate: 9.23 },
   { year: 2024, rate: 10.85 },
   { year: 2025, rate: 15.88, provisional: true },
-  { year: 2026, rate: 10.08, provisional: true, label: 'latest available month, July 2026' },
+  { year: 2026, rate: 8.98, provisional: true, label: 'latest available month, July 2026' },
 ];
 
 export interface PrincipalStep {

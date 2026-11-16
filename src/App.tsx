@@ -50,23 +50,24 @@ import { parsePartyPerformanceReport } from './parsers/partyPerformanceParser';
 
 import { DeveloperHero } from './components/DeveloperHero';
 
-const LOCAL_STORAGE_RATES_KEY = 'cbs_cof_rates_table_v2';
-const LOCAL_STORAGE_MANUAL_KEY = 'cbs_cof_manual_inputs_v2';
+const LOCAL_STORAGE_RATES_KEY = 'cbs_cof_rates_table_v3';
+const LOCAL_STORAGE_MANUAL_KEY = 'cbs_cof_manual_inputs_v4';
 
 const INITIAL_MANUAL_INPUTS: ManualInputs = {
   managingDirectorName: '',
-  valuationFirm: 'Apex Valuation & Surveyors Ltd.',
-  valuationDate: '11/11/2026',
-  marketValue: 850000.00,
-  forcedSaleValue: 550000.00,
+  valuationFirm: '……………',
+  valuationDate: '……………',
+  marketValue: null,
+  forcedSaleValue: null,
   liabilityCoveredByFsvPercentManual: '',
   useSuggestedFsvPercent: false,
-  legalNiAct: 'CR Case Pending',
-  legalArthari: 'Artha Rin Suit Filed',
-  legalOther: 'None',
-  specialRemarks: 'All calculations strictly based on CBS system records.',
+  legalNiAct: '',
+  legalArthari: '',
+  legalOther: '',
+  specialRemarks: '',
   rate2014: '',
   rate2015: '',
+  defaultCofRate: '8.98',
   bankLogo: null,
   bismillahImage: null,
   bankLine1: 'SAMMILITO ISLAMI BANK PLC.',
@@ -169,6 +170,11 @@ export default function App() {
       rate2014: r14 !== undefined ? String(r14.rate) : prev.rate2014,
       rate2015: r15 !== undefined ? String(r15.rate) : prev.rate2015,
     }));
+  };
+
+  const handleApplyDefaultCofRate = (rateValue: number) => {
+    if (isNaN(rateValue) || rateValue < 0) return;
+    setRates((prev) => prev.map((r) => ({ ...r, rate: rateValue })));
   };
 
   // Test modal state
@@ -635,6 +641,7 @@ export default function App() {
                 );
               }}
               onGoToSummary={() => setActiveTab('summary')}
+              onApplyDefaultCofRate={handleApplyDefaultCofRate}
             />
           ) : (
             /* Dual-column layout for Excel Previews & Quick Sidebar */
@@ -674,6 +681,7 @@ export default function App() {
                   onChangeManual={handleManualChange}
                   totalLiabilityA={summaryResult.liability.totalLiabilityA}
                   onOpenFullTab={() => setActiveTab('manual')}
+                  onApplyDefaultCofRate={handleApplyDefaultCofRate}
                 />
               </div>
             </div>

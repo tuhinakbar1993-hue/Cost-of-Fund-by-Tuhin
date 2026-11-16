@@ -28,6 +28,7 @@ interface ManualInputTabProps {
   ledgers: LedgerReport[];
   onChangeLedgerLatestDate: (accountNo: string, newDate: string) => void;
   onGoToSummary: () => void;
+  onApplyDefaultCofRate?: (rate: number) => void;
 }
 
 export const ManualInputTab: React.FC<ManualInputTabProps> = ({
@@ -40,6 +41,7 @@ export const ManualInputTab: React.FC<ManualInputTabProps> = ({
   ledgers,
   onChangeLedgerLatestDate,
   onGoToSummary,
+  onApplyDefaultCofRate,
 }) => {
   const logoInputRef = useRef<HTMLInputElement>(null);
   const bismillahInputRef = useRef<HTMLInputElement>(null);
@@ -182,7 +184,6 @@ export const ManualInputTab: React.FC<ManualInputTabProps> = ({
                 type="number"
                 step="0.01"
                 value={manual.marketValue ?? ''}
-                placeholder="Leave blank if none (Summary will remain blank)"
                 onChange={(e) => {
                   const v = e.target.value;
                   updateField('marketValue', v === '' ? null : parseFloat(v));
@@ -210,7 +211,6 @@ export const ManualInputTab: React.FC<ManualInputTabProps> = ({
                 type="number"
                 step="0.01"
                 value={manual.forcedSaleValue ?? ''}
-                placeholder="Leave blank if none (Summary will remain blank)"
                 onChange={(e) => {
                   const v = e.target.value;
                   updateField('forcedSaleValue', v === '' ? null : parseFloat(v));
@@ -339,7 +339,6 @@ export const ManualInputTab: React.FC<ManualInputTabProps> = ({
                 <input
                   type="text"
                   value={manual.legalNiAct}
-                  placeholder="e.g. CR Case Pending / None (Leave blank if none)"
                   onChange={(e) => updateField('legalNiAct', e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-850 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-sm"
                 />
@@ -356,7 +355,6 @@ export const ManualInputTab: React.FC<ManualInputTabProps> = ({
                 <input
                   type="text"
                   value={manual.legalArthari}
-                  placeholder="e.g. Artha Rin Suit Filed / None (Leave blank if none)"
                   onChange={(e) => updateField('legalArthari', e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-850 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-sm"
                 />
@@ -373,7 +371,6 @@ export const ManualInputTab: React.FC<ManualInputTabProps> = ({
                 <input
                   type="text"
                   value={manual.legalOther}
-                  placeholder="e.g. None / Under negotiations (Leave blank if none)"
                   onChange={(e) => updateField('legalOther', e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-850 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-sm"
                 />
@@ -410,7 +407,6 @@ export const ManualInputTab: React.FC<ManualInputTabProps> = ({
               <textarea
                 value={manual.specialRemarks}
                 rows={3}
-                placeholder="Enter special remarks or waiver conditions. If left blank, the Summary row will remain blank."
                 onChange={(e) => updateField('specialRemarks', e.target.value)}
                 className="w-full px-3 py-2 text-xs rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-850 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
@@ -454,6 +450,37 @@ export const ManualInputTab: React.FC<ManualInputTabProps> = ({
             <p className="text-[11px] text-amber-700 dark:text-amber-300 leading-relaxed">
               Rates for 2014 and 2015 must never be assumed or automatically inserted. If an account ledger has disbursement or transaction periods falling in 2014 or 2015, enter the approved rate below. If missing, the affected calculation will be paused until provided.
             </p>
+          </div>
+        </div>
+
+        {/* Settlement Summary Default Cost of Fund Rate (%) */}
+        <div className="p-4 rounded-xl border bg-neutral-50 dark:bg-neutral-850 border-neutral-200 dark:border-neutral-800 space-y-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <label className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
+              Settlement Summary — Default Cost of Fund Rate (% p.a.)
+            </label>
+            {onApplyDefaultCofRate && (
+              <button
+                type="button"
+                onClick={() => {
+                  const parsed = parseFloat(manual.defaultCofRate ?? '8.98');
+                  if (!isNaN(parsed)) onApplyDefaultCofRate(parsed);
+                }}
+                className="self-start sm:self-auto px-2.5 py-1 text-xs font-semibold rounded-md bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-200 transition-colors cursor-pointer"
+              >
+                Apply Rate to COF Schedule
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2 max-w-xs">
+            <input
+              type="number"
+              step="0.01"
+              value={manual.defaultCofRate ?? '8.98'}
+              onChange={(e) => updateField('defaultCofRate', e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-right font-mono text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            />
+            <span className="text-xs font-bold text-neutral-500">%</span>
           </div>
         </div>
 

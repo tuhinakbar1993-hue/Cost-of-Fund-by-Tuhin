@@ -362,9 +362,16 @@ export function runAllUnitTests(): TestResult[] {
     if (JSON.stringify(segCounts) !== JSON.stringify([12, 10, 8, 7])) {
       throw new Error(`Expected [12, 10, 8, 7] segments, got ${JSON.stringify(segCounts)}`);
     }
-    // 3. Total COF ~ 504,290.67
-    if (Math.abs(cofRes.totalCof - 504290.67) > 1.0) {
-      throw new Error(`Expected Total COF ~504290.67, got ${cofRes.totalCof}`);
+    // 3. Default 2026 rate is 8.98% and Total COF ~ 501,479.08 (and Summary B reflects it)
+    const rate2026 = DEFAULT_RATE_TABLE.find((r) => r.year === 2026)?.rate;
+    if (rate2026 !== 8.98) {
+      throw new Error(`Expected default 2026 rate 8.98, got ${rate2026}`);
+    }
+    if (Math.abs(cofRes.totalCof - 501479.08) > 1.0) {
+      throw new Error(`Expected Total COF ~501479.08, got ${cofRes.totalCof}`);
+    }
+    if (Math.abs(sumRes.settlement.costOfFund - cofRes.surplusDeficit) > 0.02) {
+      throw new Error(`Expected Summary COF to match surplus/deficit`);
     }
     // 4. Realized = 234,133.72
     if (Math.abs(cofRes.totalAlreadyRealized - 234133.72) > 0.05) {

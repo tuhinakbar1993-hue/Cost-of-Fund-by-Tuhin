@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SlidersHorizontal, ChevronDown, ChevronUp, Building2, Scale, Shield, FileText, Calculator } from 'lucide-react';
+import { SlidersHorizontal, ChevronDown, ChevronUp, Building2, Scale, Shield, FileText, Calculator, Percent } from 'lucide-react';
 import { ManualInputs } from '../types';
 import { calculateFsvCoveragePercent } from '../engine/summaryEngine';
 
@@ -8,6 +8,7 @@ interface ManualInputsPanelProps {
   onChangeManual: (updated: ManualInputs) => void;
   totalLiabilityA: number;
   onOpenFullTab?: () => void;
+  onApplyDefaultCofRate?: (rate: number) => void;
 }
 
 export const ManualInputsPanel: React.FC<ManualInputsPanelProps> = ({
@@ -15,6 +16,7 @@ export const ManualInputsPanel: React.FC<ManualInputsPanelProps> = ({
   onChangeManual,
   totalLiabilityA,
   onOpenFullTab,
+  onApplyDefaultCofRate,
 }) => {
   const [isOpen, setIsOpen] = useState(true);
 
@@ -78,6 +80,41 @@ export const ManualInputsPanel: React.FC<ManualInputsPanelProps> = ({
 
       {isOpen && (
         <div className="p-4 pt-0 border-t border-neutral-100 dark:border-neutral-800 space-y-4">
+          {/* Settlement Summary Default Cost of Fund Rate (%) */}
+          <div className="pt-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 mb-2 flex items-center gap-1.5">
+              <Percent className="w-3.5 h-3.5" /> Settlement Summary Cost of Fund Rate
+            </h3>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <label className="font-medium text-neutral-700 dark:text-neutral-300">
+                Default Cost of Fund Rate (%)
+              </label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  step="0.01"
+                  value={manual.defaultCofRate ?? '8.98'}
+                  onChange={(e) => updateField('defaultCofRate', e.target.value)}
+                  className="w-24 px-2.5 py-1 rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-right font-mono"
+                />
+                <span className="text-neutral-500 font-semibold">%</span>
+                {onApplyDefaultCofRate && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const parsed = parseFloat(manual.defaultCofRate ?? '8.98');
+                      if (!isNaN(parsed)) onApplyDefaultCofRate(parsed);
+                    }}
+                    className="px-2 py-1 text-[11px] font-semibold rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-200 transition-colors cursor-pointer"
+                    title="Apply this rate across the COF rate schedule"
+                  >
+                    Apply to Schedule
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* Section 1: Security Valuation (MV, FSV, FSV Coverage %) */}
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 mb-2 flex items-center gap-1.5">
@@ -118,7 +155,6 @@ export const ManualInputsPanel: React.FC<ManualInputsPanelProps> = ({
                   type="number"
                   step="0.01"
                   value={manual.marketValue ?? ''}
-                  placeholder="Leave blank if none"
                   onChange={(e) => {
                     const v = e.target.value;
                     updateField('marketValue', v === '' ? null : parseFloat(v));
@@ -135,7 +171,6 @@ export const ManualInputsPanel: React.FC<ManualInputsPanelProps> = ({
                   type="number"
                   step="0.01"
                   value={manual.forcedSaleValue ?? ''}
-                  placeholder="Leave blank if none"
                   onChange={(e) => {
                     const v = e.target.value;
                     updateField('forcedSaleValue', v === '' ? null : parseFloat(v));
@@ -197,7 +232,6 @@ export const ManualInputsPanel: React.FC<ManualInputsPanelProps> = ({
                 <input
                   type="text"
                   value={manual.legalNiAct}
-                  placeholder="e.g. CR Case No. 102/2024"
                   onChange={(e) => updateField('legalNiAct', e.target.value)}
                   className="w-full px-2.5 py-1.5 rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100"
                 />
@@ -210,7 +244,6 @@ export const ManualInputsPanel: React.FC<ManualInputsPanelProps> = ({
                 <input
                   type="text"
                   value={manual.legalArthari}
-                  placeholder="e.g. Artha Rin Suit No. 45/2023"
                   onChange={(e) => updateField('legalArthari', e.target.value)}
                   className="w-full px-2.5 py-1.5 rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100"
                 />
@@ -223,7 +256,6 @@ export const ManualInputsPanel: React.FC<ManualInputsPanelProps> = ({
                 <input
                   type="text"
                   value={manual.legalOther}
-                  placeholder="e.g. None / Under negotiations"
                   onChange={(e) => updateField('legalOther', e.target.value)}
                   className="w-full px-2.5 py-1.5 rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100"
                 />
@@ -240,7 +272,6 @@ export const ManualInputsPanel: React.FC<ManualInputsPanelProps> = ({
               value={manual.specialRemarks}
               rows={2}
               onChange={(e) => updateField('specialRemarks', e.target.value)}
-              placeholder="Enter special remarks or condition notes. Left blank if none."
               className="w-full px-2.5 py-1.5 text-xs rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100"
             />
           </div>
