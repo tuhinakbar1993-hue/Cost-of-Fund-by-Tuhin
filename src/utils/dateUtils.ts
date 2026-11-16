@@ -174,3 +174,70 @@ export function parseDateToExcelDate(dateStrOrDay: string | number): Date {
   const utcDay = parseDateToUtcDay(dateStrOrDay);
   return utcDayToDateObj(utcDay);
 }
+
+/**
+ * Strictly parses a user-entered date string (dd/mm/yyyy, dd.mm.yyyy, dd-mm-yyyy, or yyyy-mm-dd)
+ * for Settlement Summary display without ever returning NaN or falling back to a hardcoded date.
+ * Returns null if empty, incomplete, or invalid.
+ */
+export function formatSettlementSummaryDates(
+  dateStr: string | null | undefined
+): { slashDate: string; dotDate: string } | null {
+  if (!dateStr || !dateStr.trim()) return null;
+  const cleaned = dateStr.trim().replace(/\./g, '/').replace(/-/g, '/');
+  const parts = cleaned.split('/');
+  if (parts.length !== 3) return null;
+
+  let day: number;
+  let month: number;
+  let year: number;
+
+  if (parts[0].length === 4 && /^\d{4}$/.test(parts[0])) {
+    if (!/^\d{1,2}$/.test(parts[1]) || !/^\d{1,2}$/.test(parts[2])) return null;
+    year = parseInt(parts[0], 10);
+    month = parseInt(parts[1], 10);
+    day = parseInt(parts[2], 10);
+  } else {
+    if (!/^\d{1,2}$/.test(parts[0]) || !/^\d{1,2}$/.test(parts[1])) return null;
+    if (!/^\d{2}$|^\d{4}$/.test(parts[2])) return null;
+    day = parseInt(parts[0], 10);
+    month = parseInt(parts[1], 10);
+    year = parseInt(parts[2], 10);
+    if (year < 100) {
+      year = year < 50 ? 2000 + year : 1900 + year;
+    }
+  }
+
+  if (
+    isNaN(day) ||
+    isNaN(month) ||
+    isNaN(year) ||
+    year < 1900 ||
+    year > 2100 ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31
+  ) {
+    return null;
+  }
+
+  const d = new Date(Date.UTC(year, month - 1, day));
+  if (
+    isNaN(d.getTime()) ||
+    d.getUTCFullYear() !== year ||
+    d.getUTCMonth() + 1 !== month ||
+    d.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  const dd = String(day).padStart(2, '0');
+  const mm = String(month).padStart(2, '0');
+  const yyyy = String(year);
+
+  return {
+    slashDate: `${dd}/${mm}/${yyyy}`,
+    dotDate: `${dd}.${mm}.${yyyy}`,
+  };
+}

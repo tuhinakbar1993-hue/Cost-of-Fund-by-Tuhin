@@ -9,7 +9,10 @@ import {
   RateYear,
   SummaryCalculationResult,
 } from '../types';
-import { formatUtcDayDot, parseDateToExcelDate } from '../utils/dateUtils';
+import {
+  formatSettlementSummaryDates,
+  parseDateToExcelDate,
+} from '../utils/dateUtils';
 
 // Standard Excel recognized date format
 const EXCEL_DATE_FORMAT = 'dd/mm/yyyy';
@@ -427,7 +430,8 @@ async function loadImageBase64(
 export async function exportSummaryExcel(
   summaryResult: SummaryCalculationResult,
   _cofResult: CofCalculationResult,
-  manual: ManualInputs
+  manual: ManualInputs,
+  calculationUpToDate?: string
 ): Promise<void> {
   const stripUnwantedSummaryText = (val: string | null | undefined): string => {
     if (!val) return '';
@@ -436,6 +440,12 @@ export async function exportSummaryExcel(
       .replace(/[ \t]{2,}/g, ' ')
       .trim();
   };
+
+  const rawUpToDate =
+    calculationUpToDate !== undefined ? calculationUpToDate : manual.calculationUpToDate;
+  const summaryDates = formatSettlementSummaryDates(
+    stripUnwantedSummaryText(rawUpToDate)
+  );
 
   const ExcelJS = await import('exceljs');
   const workbook = new ExcelJS.Workbook();
@@ -556,7 +566,7 @@ export async function exportSummaryExcel(
 
   sheet.mergeCells('L9:P9');
   const cellL9 = sheet.getCell('L9');
-  cellL9.value = `Date:${manual.calculationUpToDate ? stripUnwantedSummaryText(manual.calculationUpToDate) : '11/11/2026'}`;
+  cellL9.value = summaryDates ? `Date:${summaryDates.slashDate}` : 'Date:';
   cellL9.font = { name: 'Arial', size: 9, bold: true, color: { argb: 'FF000000' } };
   cellL9.alignment = { horizontal: 'right' };
 
@@ -589,9 +599,9 @@ export async function exportSummaryExcel(
   // SECTION A: Liability Position
   sheet.mergeCells('C13:P13');
   const cellAHeader = sheet.getCell('C13');
-  cellAHeader.value = `A) Liability Position as per CBS (Dated on ${formatUtcDayDot(
-    Date.now()
-  )})`;
+  cellAHeader.value = summaryDates
+    ? `A) Liability Position as per CBS (Dated on ${summaryDates.dotDate})`
+    : 'A) Liability Position as per CBS';
   cellAHeader.font = { name: 'Arial', size: 8.5, bold: true, color: { argb: 'FF000000' } };
   cellAHeader.fill = headerFill;
   cellAHeader.alignment = { horizontal: 'left', vertical: 'middle' };
@@ -962,10 +972,11 @@ export async function exportBothExcel(
   cofResult: CofCalculationResult,
   summaryResult: SummaryCalculationResult,
   rateTable: RateYear[],
-  manual: ManualInputs
+  manual: ManualInputs,
+  calculationUpToDate?: string
 ): Promise<void> {
   await Promise.all([
     exportCofExcel(cofResult, rateTable, manual),
-    exportSummaryExcel(summaryResult, cofResult, manual),
+    exportSummaryExcel(summaryResult, cofResult, manual, calculationUpToDate),
   ]);
 }

@@ -6,12 +6,14 @@ import {
   SummaryCalculationResult,
 } from '../types';
 import { formatBdt, formatMillion } from '../utils/numberUtils';
+import { formatSettlementSummaryDates } from '../utils/dateUtils';
 import { calculateFsvCoveragePercent } from '../engine/summaryEngine';
 
 interface SummaryPreviewTableProps {
   summaryResult: SummaryCalculationResult;
   cofResult: CofCalculationResult;
   manual: ManualInputs;
+  calculationUpToDate?: string;
 }
 
 function stripUnwantedSummaryText(val: string | null | undefined): string {
@@ -26,6 +28,7 @@ export const SummaryPreviewTable: React.FC<SummaryPreviewTableProps> = ({
   summaryResult,
   cofResult: _cofResult,
   manual,
+  calculationUpToDate,
 }) => {
   const [showInMillions, setShowInMillions] = useState(true);
   const [showWaiverBreakdown, setShowWaiverBreakdown] = useState(false);
@@ -55,7 +58,11 @@ export const SummaryPreviewTable: React.FC<SummaryPreviewTableProps> = ({
   const bankLine3Text = manual.bankLine3 ? stripUnwantedSummaryText(manual.bankLine3) : 'UNION BANK UNIT';
   const bankLine4Text = manual.bankLine4 ? stripUnwantedSummaryText(manual.bankLine4) : 'Special Assets Management Division';
   const branchNameText = manual.branchName ? stripUnwantedSummaryText(manual.branchName) : 'EIDGAON BRANCH';
-  const calcDateText = manual.calculationUpToDate ? stripUnwantedSummaryText(manual.calculationUpToDate) : '11/11/2026';
+  const rawUpToDate =
+    calculationUpToDate !== undefined ? calculationUpToDate : manual.calculationUpToDate;
+  const summaryDates = formatSettlementSummaryDates(
+    stripUnwantedSummaryText(rawUpToDate)
+  );
   const clientNameText = manual.clientName ? stripUnwantedSummaryText(manual.clientName) : 'M/S OCEAN AGRO FARM';
   const managingDirectorText = stripUnwantedSummaryText(manual.managingDirectorName) || '-';
   const valuationFirmText = manual.valuationFirm ? stripUnwantedSummaryText(manual.valuationFirm) : 'Survey Firm';
@@ -203,7 +210,7 @@ export const SummaryPreviewTable: React.FC<SummaryPreviewTableProps> = ({
           <div className="mt-[8px] mb-[4px] text-[12px] font-bold text-black leading-[1.34]">
             <div className="flex justify-between items-baseline">
               <span>Branch Name: {branchNameText} Branch</span>
-              <span>Date:{calcDateText}</span>
+              <span>Date:{summaryDates ? summaryDates.slashDate : ''}</span>
             </div>
             <div>
               Client Name: {clientNameText}
@@ -229,7 +236,9 @@ export const SummaryPreviewTable: React.FC<SummaryPreviewTableProps> = ({
                   colSpan={3}
                   className="bg-[#D9E2F3] text-black font-bold text-left px-[4px] py-[2.5px] border border-black"
                 >
-                  A) Liability Position as per CBS (Dated on {calcDateText})
+                  {summaryDates
+                    ? `A) Liability Position as per CBS (Dated on ${summaryDates.dotDate})`
+                    : 'A) Liability Position as per CBS'}
                 </th>
               </tr>
               <tr className="bg-white text-black font-normal">

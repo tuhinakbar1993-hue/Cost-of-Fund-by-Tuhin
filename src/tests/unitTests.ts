@@ -23,6 +23,7 @@ import { groupItemsIntoLines } from '../parsers/ledgerParser';
 import { getOceanAgroSampleData } from '../sample/oceanAgroData';
 import { LedgerReport } from '../types';
 import {
+  formatSettlementSummaryDates,
   getInclusiveDays,
   parseDateToExcelDate,
   parseDateToUtcDay,
@@ -562,6 +563,36 @@ export function runAllUnitTests(): TestResult[] {
     }
     if (res.totalAlreadyRealized !== 44949.78) {
       throw new Error(`Expected Total Already Realized 44949.78, got ${res.totalAlreadyRealized}`);
+    }
+  });
+
+  // -------------------------------------------------------------
+  // Category 10: Settlement Summary Date Synchronization Formatting
+  // -------------------------------------------------------------
+  runTest('Settlement Summary Dates', 'Formats valid COF Up To Date in dd/mm/yyyy and dd.mm.yyyy without NaN or fallback dates', () => {
+    const valid = formatSettlementSummaryDates('05/11/2026');
+    if (!valid || valid.slashDate !== '05/11/2026' || valid.dotDate !== '05.11.2026') {
+      throw new Error(`Unexpected formatting for 05/11/2026: ${JSON.stringify(valid)}`);
+    }
+
+    const updated = formatSettlementSummaryDates('25/10/2026');
+    if (!updated || updated.slashDate !== '25/10/2026' || updated.dotDate !== '25.10.2026') {
+      throw new Error(`Unexpected formatting for 25/10/2026: ${JSON.stringify(updated)}`);
+    }
+
+    const empty = formatSettlementSummaryDates('');
+    if (empty !== null) {
+      throw new Error(`Expected null for empty date, got ${JSON.stringify(empty)}`);
+    }
+
+    const invalid = formatSettlementSummaryDates('31/02/2026');
+    if (invalid !== null) {
+      throw new Error(`Expected null for invalid calendar date, got ${JSON.stringify(invalid)}`);
+    }
+
+    const partial = formatSettlementSummaryDates('05/11/202');
+    if (partial !== null) {
+      throw new Error(`Expected null for incomplete year, got ${JSON.stringify(partial)}`);
     }
   });
 

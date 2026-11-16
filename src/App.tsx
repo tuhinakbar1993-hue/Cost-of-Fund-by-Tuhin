@@ -177,6 +177,11 @@ export default function App() {
     setRates((prev) => prev.map((r) => ({ ...r, rate: rateValue })));
   };
 
+  const handleCalculationUpToDateChange = (newDate: string) => {
+    setCalculationUpToDate(newDate);
+    setManual((prev) => ({ ...prev, calculationUpToDate: newDate }));
+  };
+
   // Test modal state
   const [isTestModalOpen, setIsTestModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -234,7 +239,7 @@ export default function App() {
     setLedgers(sample.ledgers);
     setOutstandingReport(sample.outstandingReport);
     setPartyPerformance(sample.partyPerformance);
-    setCalculationUpToDate('05/11/2026');
+    handleCalculationUpToDateChange('05/11/2026');
 
     setUploadedFiles([
       ...sample.ledgers.map((l) => ({
@@ -271,7 +276,7 @@ export default function App() {
     setLedgers(sample.ledgers);
     setOutstandingReport(sample.outstandingReport);
     setPartyPerformance(sample.partyPerformance);
-    setCalculationUpToDate('05/11/2026');
+    handleCalculationUpToDateChange('05/11/2026');
 
     setUploadedFiles([
       ...sample.ledgers.map((l) => ({
@@ -456,7 +461,7 @@ export default function App() {
     if (!canExport || isExporting) return;
     setIsExporting(true);
     try {
-      await exportBothExcel(cofResult, summaryResult, rates, manual);
+      await exportBothExcel(cofResult, summaryResult, rates, manual, calculationUpToDate);
     } finally {
       setIsExporting(false);
     }
@@ -476,7 +481,7 @@ export default function App() {
     if (!canExport || isExporting) return;
     setIsExporting(true);
     try {
-      await exportSummaryExcel(summaryResult, cofResult, manual);
+      await exportSummaryExcel(summaryResult, cofResult, manual, calculationUpToDate);
     } finally {
       setIsExporting(false);
     }
@@ -661,6 +666,7 @@ export default function App() {
                     summaryResult={summaryResult}
                     cofResult={cofResult}
                     manual={manual}
+                    calculationUpToDate={calculationUpToDate}
                   />
                 )}
               </div>
@@ -671,7 +677,7 @@ export default function App() {
                   rates={rates}
                   onChangeRates={handleRatesChange}
                   calculationUpToDate={calculationUpToDate}
-                  onChangeUpToDate={setCalculationUpToDate}
+                  onChangeUpToDate={handleCalculationUpToDateChange}
                   missingYears={cofResult.missingYears}
                   onResetDefaults={() => handleRatesChange(DEFAULT_RATE_TABLE)}
                 />
