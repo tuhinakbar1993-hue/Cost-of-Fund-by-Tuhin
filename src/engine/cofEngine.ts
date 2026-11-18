@@ -19,6 +19,8 @@ import {
 import { round2 } from '../utils/numberUtils';
 
 export const DEFAULT_RATE_TABLE: RateYear[] = [
+  { year: 2014, rate: 12.33 },
+  { year: 2015, rate: 11.82 },
   { year: 2016, rate: 9.53 },
   { year: 2017, rate: 9.35 },
   { year: 2018, rate: 10.31 },

@@ -432,17 +432,33 @@ export function runAllUnitTests(): TestResult[] {
       finalPrincipalBalance: 100000,
     };
 
-    // First check: without 2014 and 2015 in rates, missingYears flags 2014 and 2015
-    const resWithout = calculateAllCof([ledger2014], null, DEFAULT_RATE_TABLE, '31/12/2015');
+    // First check: DEFAULT_RATE_TABLE includes 2014 (12.33%) and 2015 (11.82%) automatically
+    const resDefault = calculateAllCof([ledger2014], null, DEFAULT_RATE_TABLE, '31/12/2015');
+    if (resDefault.missingYears.length > 0) {
+      throw new Error(`Missing years should be empty with default 2014/2015 rates`);
+    }
+    if (resDefault.allSegments.length !== 2) {
+      throw new Error(`Expected 2 segments with default rates, got ${resDefault.allSegments.length}`);
+    }
+    if (resDefault.allSegments[0].rate !== 12.33 || resDefault.allSegments[0].year !== 2014) {
+      throw new Error(`Default 2014 segment rate mismatch: ${resDefault.allSegments[0].rate}`);
+    }
+    if (resDefault.allSegments[1].rate !== 11.82 || resDefault.allSegments[1].year !== 2015) {
+      throw new Error(`Default 2015 segment rate mismatch: ${resDefault.allSegments[1].rate}`);
+    }
+
+    // Second check: without 2014 and 2015 in rates, missingYears flags 2014 and 2015
+    const ratesWithoutPre2016 = DEFAULT_RATE_TABLE.filter((r) => r.year >= 2016);
+    const resWithout = calculateAllCof([ledger2014], null, ratesWithoutPre2016, '31/12/2015');
     if (!resWithout.missingYears.includes(2014) || !resWithout.missingYears.includes(2015)) {
       throw new Error(`Expected missing years to flag 2014 and 2015`);
     }
 
-    // Now supply 2014 rate @ 11.20% and 2015 rate @ 10.80%
+    // Third check: user-entered custom rates override 2014 rate @ 11.20% and 2015 rate @ 10.80%
     const customRates = [
       { year: 2014, rate: 11.20 },
       { year: 2015, rate: 10.80 },
-      ...DEFAULT_RATE_TABLE,
+      ...ratesWithoutPre2016,
     ];
 
     const resWith = calculateAllCof([ledger2014], null, customRates, '31/12/2015');

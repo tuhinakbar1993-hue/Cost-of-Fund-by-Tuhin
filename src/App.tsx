@@ -65,8 +65,8 @@ const INITIAL_MANUAL_INPUTS: ManualInputs = {
   legalArthari: '',
   legalOther: '',
   specialRemarks: '',
-  rate2014: '',
-  rate2015: '',
+  rate2014: '12.33',
+  rate2015: '11.82',
   defaultCofRate: '8.98',
   bankLogo: null,
   bismillahImage: null,
@@ -89,7 +89,14 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          const next: RateYear[] = [...parsed];
+          if (!next.some((r) => r.year === 2014)) {
+            next.push({ year: 2014, rate: 12.33 });
+          }
+          if (!next.some((r) => r.year === 2015)) {
+            next.push({ year: 2015, rate: 11.82 });
+          }
+          return next.sort((a, b) => a.year - b.year);
         }
       }
     } catch {
@@ -123,7 +130,12 @@ export default function App() {
     try {
       const saved = sessionStorage.getItem(LOCAL_STORAGE_MANUAL_KEY);
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        return {
+          ...parsed,
+          rate2014: parsed.rate2014 && String(parsed.rate2014).trim() !== '' ? parsed.rate2014 : '12.33',
+          rate2015: parsed.rate2015 && String(parsed.rate2015).trim() !== '' ? parsed.rate2015 : '11.82',
+        };
       }
     } catch {
       // ignore
